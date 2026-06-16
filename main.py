@@ -36,7 +36,7 @@ def put_livros (id_livro: int, livro: Livro):
     if id_livro not in biblioteca:
         raise HTTPException(status_code=404, detail="Livro não encontrado")
     else:
-        meu_livro[id_livro] = livro.dict()
+        biblioteca[id_livro] = livro.dict()
 
         return {"message": "Livro atualizado com sucesso!"}
     
