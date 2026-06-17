@@ -44,12 +44,29 @@ def autenticar_usuario(credentials: HTTPBasicCredentials = Depends(security)):
 
 
 @app.get("/livros")
-def get_livros(credentials: HTTPBasicCredentials = Depends(autenticar_usuario)):
+def get_livros(page : int = 1, limit: int = 10, credentials: HTTPBasicCredentials = Depends(autenticar_usuario)):
+    if page < 1 or limit < 1:
+        raise HTTPException(status_code=400, detail="Page e limit com valores inválidos.")
     if not biblioteca:
-        return {"message": "Nenhum livro cadastrado no momento."}
-    else:
-        return {"livros": biblioteca}
+        raise HTTPException(status_code=404, detail="Nenhum livro cadastrado no momento.")
     
+    livros_ordenados = sorted(biblioteca.items(), key=lambda x: x[0])
+    
+    start = (page - 1) * limit
+    end = start + limit
+
+    paginas_livros = [
+        {"id": id_livro, "nome_livro": livro_data["nome_livro"], "autor_livro": livro_data["autor_livro"], "ano_livro": livro_data["ano_livro"]}
+        for id_livro, livro_data in livros_ordenados[start:end]
+    ]
+
+    return {
+        "page": page, 
+            "limit": limit, 
+            "total": len(biblioteca), 
+            "livros": paginas_livros
+        }
+
 @app.post("/adiciona")
 def post_livros(id_livro: int, livro: Livro, credentials: HTTPBasicCredentials = Depends(autenticar_usuario)):
     if id_livro in biblioteca:
