@@ -1,13 +1,9 @@
-# API de livros
-
+import os
 import secrets
-
-from fastapi import FastAPI, HTTPException, Depends
+from typing import Optional
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
-from typing import Optional
-import secrets 
-import os
 
 app = FastAPI(
     title="API de livros",
@@ -44,28 +40,49 @@ def autenticar_usuario(credentials: HTTPBasicCredentials = Depends(security)):
 
 
 @app.get("/livros")
-def get_livros(page : int = 1, limit: int = 10, credentials: HTTPBasicCredentials = Depends(autenticar_usuario)):
-    if page < 1 or limit < 1:
-        raise HTTPException(status_code=400, detail="Page e limit com valores inválidos.")
+def get_livros(
+    page: int = 1, 
+    size: int = 10,  
+    sort_by: str = "id",
+    credentials: HTTPBasicCredentials = Depends(autenticar_usuario)
+):
+    if page < 1 or size < 1:
+        raise HTTPException(status_code=400, detail="Page e size com valores inválidos.")
     if not biblioteca:
         raise HTTPException(status_code=404, detail="Nenhum livro cadastrado no momento.")
     
-    livros_ordenados = sorted(biblioteca.items(), key=lambda x: x[0])
+    campos_validos = ["id", "nome_livro", "autor_livro", "ano_livro"]
+    if sort_by not in campos_validos:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Campo de ordenação inválido. Escolha entre: {', '.join(campos_validos)}"
+        )
+
+    if sort_by == "id":
+        livros_ordenados = sorted(biblioteca.items(), key=lambda x: x[0])
+    else:
+        livros_ordenados = sorted(biblioteca.items(), key=lambda x: x[1][sort_by])
     
-    start = (page - 1) * limit
-    end = start + limit
+
+    start = (page - 1) * size
+    end = start + size
 
     paginas_livros = [
-        {"id": id_livro, "nome_livro": livro_data["nome_livro"], "autor_livro": livro_data["autor_livro"], "ano_livro": livro_data["ano_livro"]}
+        {
+            "id": id_livro, 
+            "nome_livro": livro_data["nome_livro"], 
+            "autor_livro": livro_data["autor_livro"], 
+            "ano_livro": livro_data["ano_livro"]
+        }
         for id_livro, livro_data in livros_ordenados[start:end]
     ]
 
     return {
         "page": page, 
-            "limit": limit, 
-            "total": len(biblioteca), 
-            "livros": paginas_livros
-        }
+        "size": size, 
+        "total": len(biblioteca), 
+        "livros": paginas_livros
+    }
 
 @app.post("/adiciona")
 def post_livros(id_livro: int, livro: Livro, credentials: HTTPBasicCredentials = Depends(autenticar_usuario)):
@@ -76,14 +93,12 @@ def post_livros(id_livro: int, livro: Livro, credentials: HTTPBasicCredentials =
         return {"message": "Livro adicionado com sucesso!"}
     
 @app.put("/atualiza/{id_livro}")
-def put_livros (id_livro: int, livro: Livro, credentials: HTTPBasicCredentials = Depends(autenticar_usuario)):
-    meu_livro = biblioteca.get(id_livro)
+def put_livros(id_livro: int, livro: Livro, credentials: HTTPBasicCredentials = Depends(autenticar_usuario)):
     if id_livro not in biblioteca:
         raise HTTPException(status_code=404, detail="Livro não encontrado")
     else:
         biblioteca[id_livro] = livro.dict()
-
-        return {"message": "Livro atualizado com sucesso!"}
+        return {"message": "Livro updated com sucesso!"}
     
 
 @app.delete("/deleta/{id_livro}")
